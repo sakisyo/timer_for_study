@@ -6,7 +6,38 @@ export default function StudyTimer() {
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
-  const audioRef = useRef(null);
+  const audioCtxRef = useRef(null);
+
+  // 再生には必ずユーザー操作が必要なため、開始ボタン押下時に初期化する
+  const ensureAudio = () => {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new Ctx();
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+  };
+
+  // 3音の上昇チャイムを合成して鳴らす
+  const playChime = () => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    [880, 1108.73, 1318.51].forEach((freq, i) => {
+      const start = ctx.currentTime + i * 0.18;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.linearRampToValueAtTime(0.25, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.5);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.55);
+    });
+  };
 
   useEffect(() => {
     let interval = null;
@@ -16,10 +47,7 @@ export default function StudyTimer() {
           if (time <= 1) {
             setIsRunning(false);
             setIsFinished(true);
-            // Play sound when timer finishes
-            if (audioRef.current) {
-              audioRef.current.play().catch(e => console.log('Audio play failed:', e));
-            }
+            playChime();
             return 0;
           }
           return time - 1;
@@ -38,6 +66,7 @@ export default function StudyTimer() {
   };
 
   const handleStart = () => {
+    ensureAudio();
     if (timeLeft === 0) {
       setTimeLeft(selectedMinutes * 60);
       setIsFinished(false);
@@ -68,8 +97,6 @@ export default function StudyTimer() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-4">
-      <audio ref={audioRef} src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE=" />
-      
       <div className="text-center mb-8">
         <h1 className="text-5xl md:text-7xl font-bold text-white mb-4">勉強タイマー</h1>
         <div className="inline-block">
